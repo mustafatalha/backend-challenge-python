@@ -119,10 +119,13 @@ def test_different_guest_same_unit_booking(test_db):
 
 @pytest.mark.freeze_time('2023-05-21')
 def test_different_guest_same_unit_booking_different_date(test_db):
+    guess_a_unit_1: dict = GUEST_A_UNIT_1.copy()
+    guess_a_unit_1['check_in_date'] = datetime.date.today().strftime('%Y-%m-%d')
+
     # Create first booking
     response = client.post(
         "/api/v1/booking",
-        json=GUEST_A_UNIT_1
+        json=guess_a_unit_1
     )
     assert response.status_code == 200, response.text
 
@@ -139,3 +142,139 @@ def test_different_guest_same_unit_booking_different_date(test_db):
     )
     assert response.status_code == 400, response.text
     assert response.json()['detail'] == 'For the given check-in date, the unit is already occupied'
+
+
+def test_get_bookings(test_db):
+    # Create booking
+    response = client.post(
+        "/api/v1/booking",
+        json=GUEST_A_UNIT_1
+    )
+    assert response.status_code == 200, response.text
+
+    # Get booking with both unit_id and guest_name
+    response = client.get(
+        "/api/v1/booking",
+        params={
+            'unit_id': GUEST_A_UNIT_1.get('unit_id'),
+            'guest_name': GUEST_A_UNIT_1.get('guest_name')
+        }
+    )
+    assert response.json() == GUEST_A_UNIT_1
+
+    # Get bookings with only guest_name
+    response = client.get(
+        "/api/v1/booking",
+        params={
+            'guest_name': GUEST_A_UNIT_1.get('guest_name')
+        }
+    )
+    assert response.json() == [GUEST_A_UNIT_1]
+
+    # Get bookings with only unit_id
+    response = client.get(
+        "/api/v1/booking",
+        params={
+            'unit_id': GUEST_A_UNIT_1.get('unit_id')
+        }
+    )
+    assert response.json() == [GUEST_A_UNIT_1]
+
+
+
+
+def test_booking_extension_happy_path(test_db):
+    # Create booking
+    response = client.post(
+        "/api/v1/booking",
+        json=GUEST_A_UNIT_1
+    )
+    assert response.status_code == 200, response.text
+
+    # Extend stay
+    response = client.post(
+        "/api/v1/booking/extension",
+        params={
+            'guest_name': GUEST_A_UNIT_1.get('guest_name'),
+            'unit_id': GUEST_A_UNIT_1.get('unit_id'),
+            'extra_nights': 7,
+        }
+    )
+
+    assert response.status_code == 200, response.text
+
+
+@pytest.mark.freeze_time('2023-05-21')
+def test_booking_extension_unit_unavailable(test_db):
+    guess_a_unit_1: dict = GUEST_A_UNIT_1.copy()
+    guess_a_unit_1['check_in_date'] = datetime.date.today().strftime('%Y-%m-%d')
+    # Create first booking
+    response = client.post(
+        "/api/v1/booking",
+        json=guess_a_unit_1
+    )
+    assert response.status_code == 200, response.text
+
+    # Create 2nd booking same unit but later date
+    response = client.post(
+        "/api/v1/booking",
+        json={
+            'unit_id': guess_a_unit_1.get('unit_id'),  # same unit
+            'guest_name': 'GuestB',  # different guest
+            'check_in_date': (datetime.date.today()
+                              + datetime.timedelta(2 + guess_a_unit_1.get("number_of_nights"))).strftime('%Y-%m-%d'),
+            'number_of_nights': 5
+        }
+    )
+    assert response.status_code == 200, response.text
+
+    # Test 'For the extension period, the unit is already occupied'
+    response = client.post(
+        "/api/v1/booking/extension",
+        params={
+            'guest_name': guess_a_unit_1.get('guest_name'),
+            'unit_id': guess_a_unit_1.get('unit_id'),
+            'extra_nights': 15,
+        }
+    )
+
+    assert response.status_code == 400, response.text
+    assert response.json()['detail'] == 'For the extension period, the unit is already occupied'
+
+
+@pytest.mark.freeze_time('2023-05-21')
+def test_booking_extension_same_guest_different_unit(test_db):
+    guess_a_unit_1: dict = GUEST_A_UNIT_1.copy()
+    guess_a_unit_1['check_in_date'] = datetime.date.today().strftime('%Y-%m-%d')
+    # Create first booking
+    response = client.post(
+        "/api/v1/booking",
+        json=guess_a_unit_1
+    )
+    assert response.status_code == 200, response.text
+
+    # Create 2nd booking same unit but later date
+    response = client.post(
+        "/api/v1/booking",
+        json={
+            'unit_id': "6",  # another unit
+            'guest_name': guess_a_unit_1.get('guest_name'),  # same guest
+            'check_in_date': (datetime.date.today()
+                              + datetime.timedelta(2 + guess_a_unit_1.get("number_of_nights"))).strftime('%Y-%m-%d'),
+            'number_of_nights': 5
+        }
+    )
+    assert response.status_code == 200, response.text
+
+    # Test 'For the extension period, the unit is already occupied'
+    response = client.post(
+        "/api/v1/booking/extension",
+        params={
+            'guest_name': guess_a_unit_1.get('guest_name'),
+            'unit_id': guess_a_unit_1.get('unit_id'),
+            'extra_nights': 15,
+        }
+    )
+
+    assert response.status_code == 400, response.text
+    assert response.json()['detail'] == 'The same guest cannot be in multiple units at the same time'

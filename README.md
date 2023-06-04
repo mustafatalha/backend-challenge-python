@@ -1,5 +1,17 @@
 # Backend test
 
+### Updates
+#### Bug Fixes
+There were 2 bugs at the crud layer and 1 test error.
+- It was only checking guest_name at Check-2 of is_booking_possible func. This is not enough since a customer may do booking several times to different units. So, I added a computed property to BookingBase and a check_out_date column to the database. Then I added checking of period to is_booking_possible Check-2. So, we were satisfied with the "same-time" condition.
+- It was checking check_in_date and unit_id at Check-3. Control of check_in_date is not enough since customers will stay for a period. Same as above, I added period control with both check-in and check-out dates.
+- There was a test error at test_different_guest_same_unit_booking_different_date, fixed it with a small copy to get the date in freeze time.
+
+#### New Feature
+- Get Booking: I wanted to add a get booking endpoint to see what record we have. That endpoint has 2 optional parameters. You can check from /docs. I also check db from a DB Manager too, but a new endpoint doesn't hurt.
+- Allowing guests to extend their stays: I added a new endpoint(extensions) to extend stay. It basically accepts guest_name and unit_id to identify books, also extra nights to extend. In crud.py, there are new functions such as extend_stay and is_extension_possible.
+- Booking Extension History: I added new models, table and crud operations for booking extension history. I thought keeping this data somewhere may help with the data analysis process.
+- Added new tests for get booking and booking extension.
 ## Context
 
 We would like you to help us with a small service that we have for handling bookings. A booking for us simply tells us which guest will be staying in which unit, and when they arrive and the number of nights that guest will be enjoying our amazing suites, comfortable beds, great snac.. apologies - I got distracted. Bookings are at the very core of our business and it's important that we get these right - we want to make sure that guests always get what they paid for, and also trying to ensure that our unit are continually booked and have as few empty nights where no-one stays as possible. A unit is simply a location that can be booked, think like a hotel room or even a house. For the exercise today, we would like you to help us solve an issue we've been having with our example service, as well as implement a new feature to improve the code base. While this is an opportunity for you to showcase your skills, we also want to be respectful of your time and suggest spending no more than 3 hours on this (of course you may also spend longer if you feel that is necessary)
